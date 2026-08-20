@@ -69,10 +69,20 @@ abstract class AbstractProxy
             return;
         }
 
+        // SECURITY FIX: Validate proxy URL to prevent SSRF attacks
+        if (!self::_isValidProxyUrl($proxyUrl)) {
+            $this->_error = 'Proxy error: Invalid proxy URL. Access to internal services is blocked.';
+            $this->logErrorWithClassName($this->_error);
+            return;
+        }
+
         $data = file_get_contents($proxyUrl, false,
             stream_context_create(
                 [
-                    'http' => $this->_getProxyPayload($conf, $link),
+                    'http' => array_merge(
+                        $this->_getProxyPayload($conf, $link),
+                        ['timeout' => 10] // Add timeout to prevent hanging
+                    ),
                 ]
             )
         );
@@ -109,6 +119,50 @@ abstract class AbstractProxy
     private function logErrorWithClassName(string $error)
     {
         error_log('[' . get_class($this) . '] ' . $error);
+    }
+
+    /**
+     * Validate proxy URL to prevent Server-Side Request Forgery (SSRF) attacks
+     * Blocks access to internal/private IP ranges
+     *
+     * @static
+     * @access private
+     * @param string $url
+     * @return bool
+     */
+    private static function _isValidProxyUrl(string $url)
+    {
+        $parts = parse_url($url);
+        if ($parts === false || empty($parts['host']) || !in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true) || isset($parts['user'], $parts['pass'])) {
+            return false;
+        }
+
+        $host = $parts['host'];
+        $addresses = filter_var($host, FILTER_VALIDATE_IP) ? [$host] : [];
+        if (empty($addresses)) {
+            $records = @dns_get_record($host, DNS_A | DNS_AAAA);
+            if ($records === false || empty($records)) {
+                return false;
+            }
+            foreach ($records as $record) {
+                $address = $record['ip'] ?? $record['ipv6'] ?? null;
+                if ($address !== null) {
+                    $addresses[] = $address;
+                }
+            }
+        }
+
+        if (empty($addresses)) {
+            return false;
+        }
+
+        foreach ($addresses as $address) {
+            if (!filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

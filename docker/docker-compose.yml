@@ -1,0 +1,17 @@
+services:
+  privatebin:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: privatebin
+    restart: unless-stopped
+    environment:
+      - CONFIG_PATH=/etc/privatebin
+    volumes:
+      - privatebin_data:/var/www/html/data
+      - ./conf.php:/etc/privatebin/conf.php:ro
+    ports:
+      - "127.0.0.1:8087:80"
+
+volumes:
+  privatebin_data:

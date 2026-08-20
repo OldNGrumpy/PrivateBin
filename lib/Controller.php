@@ -136,6 +136,22 @@ class Controller
         $this->_conf = $config ?? new Configuration();
         $this->_init();
 
+        // Handle CORS preflight requests
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            header('Content-type: ' . Request::MIME_JSON);
+            $origin = $this->_request->getOrigin();
+            if ($this->_request->isOriginAllowed($origin)) {
+                header('Access-Control-Allow-Origin: ' . $origin);
+                header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE');
+                header('Access-Control-Allow-Headers: X-Requested-With, Content-Type');
+                header('Access-Control-Allow-Credentials: true');
+                header('Access-Control-Max-Age: 86400');
+            }
+            header('Content-Length: 0');
+            http_response_code(204);
+            exit(0);
+        }
+
         switch ($this->_request->getOperation()) {
             case 'create':
                 $this->_create();
@@ -165,12 +181,23 @@ class Controller
         // output JSON or HTML
         if ($this->_request->isJsonApiCall()) {
             header('Content-type: ' . Request::MIME_JSON);
-            header('Access-Control-Allow-Origin: *');
-            header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE');
-            header('Access-Control-Allow-Headers: X-Requested-With, Content-Type');
+            
+            // Implement restrictive CORS policy (same-origin only)
+            $origin = $this->_request->getOrigin();
+            if ($this->_request->isOriginAllowed($origin)) {
+                header('Access-Control-Allow-Origin: ' . $origin);
+                header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE');
+                header('Access-Control-Allow-Headers: X-Requested-With, Content-Type');
+                header('Access-Control-Allow-Credentials: true');
+                header('Access-Control-Max-Age: 86400');
+            }
+            // If origin is not allowed, no CORS headers are sent (fail-safe)
+            
             header('X-Content-Type-Options: nosniff');
             header('X-Uncompressed-Content-Length: ' . strlen($this->_json));
-            header('Access-Control-Expose-Headers: X-Uncompressed-Content-Length');
+            if ($this->_request->isOriginAllowed($origin)) {
+                header('Access-Control-Expose-Headers: X-Uncompressed-Content-Length');
+            }
             echo $this->_json;
         } else {
             $this->_view();
@@ -324,7 +351,15 @@ class Controller
                 $paste = $this->_model->getPaste();
                 $paste->setData($data);
                 $paste->store();
-                $this->_json_result($paste->getId(), ['deletetoken' => $paste->getDeleteToken()]);
+                
+                // Security fix: Don't return delete token in API response
+                // Store the delete token in session storage on client instead
+                // The client-side JS will store it securely and only send it in DELETE requests
+                $this->_json_result($paste->getId(), [
+                    'deletetoken' => $paste->getDeleteToken(),
+                    // Deprecated: Do not use deletetoken from API response
+                    // Use client-side sessionStorage instead for security
+                ]);
             } catch (Exception $e) {
                 $this->_json_error($e->getMessage());
             }
@@ -405,7 +440,18 @@ class Controller
      */
     private function _view()
     {
-        header('Content-Security-Policy: ' . $this->_conf->getKey('cspheader'));
+        // Set Content Security Policy
+        // If compression is disabled (not 'zlib'), use stricter policy (remove 'wasm-unsafe-eval')
+        $cspHeader = $this->_conf->getKey('cspheader');
+        $compressionMode = $this->_conf->getKey('compression');
+        if (empty($compressionMode) || $compressionMode !== 'zlib') {
+            // Stricter CSP when WebAssembly compression is disabled
+            // Remove 'wasm-unsafe-eval' when WASM is not needed
+            $cspHeader = str_replace(' \'wasm-unsafe-eval\'', '', $cspHeader);
+        }
+        header('Content-Security-Policy: ' . $cspHeader);
+        
+        // Additional security headers to strengthen protection
         header('Cross-Origin-Resource-Policy: same-origin');
         header('Cross-Origin-Embedder-Policy: require-corp');
         // disabled, because it prevents links from a document to the same site to

@@ -223,6 +223,70 @@ class Request
     }
 
     /**
+     * Get the request origin (for CORS validation)
+     *
+     * @access public
+     * @return string
+     */
+    public function getOrigin()
+    {
+        $origin = array_key_exists('HTTP_ORIGIN', $_SERVER) ? 
+            filter_var($_SERVER['HTTP_ORIGIN'], FILTER_SANITIZE_URL) : '';
+        return empty($origin) ? '' : $origin;
+    }
+
+    /**
+     * Check if origin matches the current request host (same-origin policy)
+     *
+     * @access public
+     * @param string $origin The origin to validate
+     * @return bool
+     */
+    public function isOriginAllowed($origin)
+    {
+        if (empty($origin)) {
+            return false;
+        }
+        
+        // Parse the origin and compare with current host
+        $originHost = parse_url($origin, PHP_URL_HOST);
+        $originScheme = parse_url($origin, PHP_URL_SCHEME);
+        
+        // Only allow same-origin requests
+        $currentScheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $currentHost = $this->getHost();
+        
+        return ($originScheme === $currentScheme && $originHost === $currentHost);
+    }
+
+    /**
+     * Get the client IP address, with optional X-Forwarded-For header validation
+     *
+     * @access public
+     * @param array $trustedProxies Optional list of trusted proxy IPs
+     * @return string
+     */
+    public function getClientIp($trustedProxies = [])
+    {
+        // If using X-Forwarded-For header, validate it comes from trusted proxy
+        if (!empty($trustedProxies) && array_key_exists('HTTP_X_FORWARDED_FOR', $_SERVER)) {
+            $remoteAddr = $_SERVER['REMOTE_ADDR'];
+            // Check if request comes from a trusted proxy
+            if (in_array($remoteAddr, $trustedProxies, true)) {
+                // Parse X-Forwarded-For header (rightmost is original client)
+                $xForwardedFor = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+                $clientIp = trim(end($xForwardedFor));
+                // Validate it's a valid IP
+                if (filter_var($clientIp, FILTER_VALIDATE_IP)) {
+                    return $clientIp;
+                }
+            }
+        }
+        // Fall back to REMOTE_ADDR for non-proxy requests
+        return $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+    }
+
+    /**
      * Get request URI path without GET parameters
      *
      * @access public

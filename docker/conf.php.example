@@ -2,6 +2,9 @@
 ; config file for PrivateBin
 ;
 ; An explanation of each setting can be find online at https://github.com/PrivateBin/PrivateBin/wiki/Configuration.
+;
+; Copy this file to "conf.php" next to it, fill in your domain below, and
+; point CONFIG_PATH at this directory (see docker/docker-compose.yml).
 
 [main]
 ; (optional) set a project name to be displayed on the website
@@ -10,7 +13,7 @@
 ; The full URL, with the domain name and directories that point to the
 ; PrivateBin files, including an ending slash (/). This URL is essential to
 ; allow Opengraph images to be displayed on social networks.
-; basepath = "https://privatebin.example.com/"
+basepath = "https://paste.example.com/"
 
 ; enable or disable the discussion feature, defaults to true
 discussion = true
@@ -183,13 +186,14 @@ limit = 10
 ; separated. Leave unset to allow anyone to create documents.
 ; creators = "1.2.3.4,10.10.10/24"
 
-; (optional) if your website runs behind a reverse proxy or load balancer,
-; set the HTTP header containing the visitors IP address, i.e. X_FORWARDED_FOR
-; header = "X_FORWARDED_FOR"
+; This deployment sits behind 1Panel's own OpenResty reverse proxy on the same
+; host, which forwards the real visitor IP in X-Forwarded-For. Trust only that
+; local hop so the header can't be spoofed by anyone but the proxy itself.
+header = "X_FORWARDED_FOR"
 
 ; (required when "header" is set) comma-separated IP addresses of trusted
 ; reverse proxies. The forwarded header is ignored from all other clients.
-; trusted_proxies = "192.0.2.10,198.51.100.10"
+trusted_proxies = "127.0.0.1"
 
 [purge]
 ; minimum time limit between two purgings of expired documents, it is only
@@ -208,109 +212,3 @@ batchsize = 10
 class = Filesystem
 [model_options]
 dir = PATH "data"
-
-;[model]
-; example of a Google Cloud Storage configuration
-;class = GoogleCloudStorage
-;[model_options]
-;bucket = "my-private-bin"
-;prefix = "pastes"
-;uniformacl = false
-
-;[model]
-; example of DB configuration for MySQL
-;class = Database
-;[model_options]
-;dsn = "mysql:host=localhost;dbname=privatebin;charset=UTF8"
-;tbl = "privatebin_"	; table prefix
-;usr = "privatebin"
-;pwd = "Z3r0P4ss"
-;opt[12] = true	  ; PDO::ATTR_PERSISTENT
-
-;[model]
-; example of DB configuration for SQLite
-;class = Database
-;[model_options]
-;dsn = "sqlite:" PATH "data/db.sq3"
-;usr = null
-;pwd = null
-;opt[12] = true	; PDO::ATTR_PERSISTENT
-
-;[model]
-; example of DB configuration for PostgreSQL
-;class = Database
-;[model_options]
-;dsn = "pgsql:host=localhost;dbname=privatebin"
-;tbl = "privatebin_"     ; table prefix
-;usr = "privatebin"
-;pwd = "Z3r0P4ss"
-;opt[12] = true    ; PDO::ATTR_PERSISTENT
-
-;[model]
-; example of S3 configuration for Rados gateway / CEPH
-;class = S3Storage
-;[model_options]
-;region = ""
-;version = "2006-03-01"
-;endpoint = "https://s3.my-ceph.invalid"
-;use_path_style_endpoint = true
-;bucket = "my-bucket"
-;accesskey = "my-rados-user"
-;secretkey = "my-rados-pass"
-
-;[model]
-; example of S3 configuration for AWS
-;class = S3Storage
-;[model_options]
-;region = "eu-central-1"
-;version = "latest"
-;bucket = "my-bucket"
-;accesskey = "access key id"
-;secretkey = "secret access key"
-
-;[model]
-; example of S3 configuration for AWS using its SDK default credential provider chain
-; if relying on environment variables, the AWS SDK will look for the following:
-; - AWS_ACCESS_KEY_ID
-; - AWS_SECRET_ACCESS_KEY
-; - AWS_SESSION_TOKEN (if needed)
-; for more details, see https://docs.aws.amazon.com/sdk-for-php/v3/developer-guide/guide_credentials.html#default-credential-chain
-;class = S3Storage
-;[model_options]
-;region = "eu-central-1"
-;version = "latest"
-;bucket = "my-bucket"
-
-;[shlink]
-; - Shlink requires you to make a post call with a generated API key.
-;   use this section to setup the API key and URL. In order to use this section,
-;   "urlshortener" needs to point to the base URL of your PrivateBin
-;   instance with "?shortenviashlink&link=" appended. For example:
-;   urlshortener = "${basepath}?shortenviashlink&link="
-;   This URL will in turn call Shlink on the server side, using the URL from
-;   "apiurl" and the API Key from the "apikey" parameters below.
-; apiurl = "https://shlink.example.com/rest/v3/short-urls"
-; apikey = "your_api_key"
-
-;[yourls]
-; When using YOURLS as a "urlshortener" config item:
-; - By default, "urlshortener" will point to the YOURLS API URL, with or without
-;   credentials, and will be visible in public on the PrivateBin web page.
-;   Only use this if you allow short URL creation without credentials.
-; - Alternatively, using the parameters in this section ("signature" and
-;   "apiurl"), "urlshortener" needs to point to the base URL of your PrivateBin
-;   instance with "?shortenviayourls&link=" appended. For example:
-;   urlshortener = "${basepath}?shortenviayourls&link="
-;   This URL will in turn call YOURLS on the server side, using the URL from
-;   "apiurl" and the "access signature" from the "signature" parameters below.
-
-; (optional) the "signature" (access key) issued by YOURLS for the using account
-; signature = ""
-; (optional) the URL of the YOURLS API, called to shorten a PrivateBin URL
-; apiurl = "https://yourls.example.com/yourls-api.php"
-
-;[sri]
-; Subresource integrity (SRI) hashes used in template files. Uncomment and set
-; these for all js files used. See:
-; https://github.com/PrivateBin/PrivateBin/wiki/FAQ#user-content-how-to-make-privatebin-work-when-i-have-changed-some-javascript-files
-;js/privatebin.js = "sha512-[…]"

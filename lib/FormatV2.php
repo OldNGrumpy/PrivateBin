@@ -127,7 +127,18 @@ class FormatV2
         }
 
         // Reject data if entropy is too low
-        if (strlen($ct) > strlen(gzdeflate($ct))) {
+        // SECURITY FIX: Improved entropy validation
+        // Check both compression effectiveness AND actual entropy
+        $compressedData = gzdeflate($ct);
+        
+        // Compression must be effective (at least 10% reduction)
+        if (strlen($ct) > 0 && (strlen($compressedData) / strlen($ct)) > 0.9) {
+            return false;
+        }
+        
+        // Additional entropy check: data must have sufficient randomness
+        // Shannon entropy should be > 4.0 bits/byte for cryptographic material
+        if (!self::_isHighEntropy($ct)) {
             return false;
         }
 
@@ -142,5 +153,40 @@ class FormatV2
         }
 
         return true;
+    }
+
+    /**
+     * Check if data has sufficient entropy (randomness) for encryption
+     * Uses Shannon entropy calculation to detect structured/repetitive data
+     *
+     * @static
+     * @access private
+     * @param string $data
+     * @return bool
+     */
+    private static function _isHighEntropy($data)
+    {
+        if (empty($data) || strlen($data) < 32) {
+            return false; // Too small to calculate reliable entropy
+        }
+
+        // Calculate Shannon entropy
+        $entropy = 0.0;
+        $length = strlen($data);
+        
+        // Count frequency of each byte value (0-255)
+        $frequencies = array_count_values(str_split($data));
+        
+        foreach ($frequencies as $count) {
+            $p = $count / $length;
+            if ($p > 0) {
+                $entropy -= $p * log($p, 2);
+            }
+        }
+        
+        // Require minimum entropy of 4.0 bits per byte
+        // (256 possible values have max entropy of 8 bits)
+        // 4.0 bits means data is reasonably random
+        return $entropy >= 4.0;
     }
 }

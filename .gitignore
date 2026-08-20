@@ -5,6 +5,9 @@ cfg/*
 !cfg/conf.sample.php
 !cfg/.htaccess
 
+# Ignore the real server-side config for the Docker deployment
+docker/conf.php
+
 # Ignore data/
 /data/
 

@@ -72,11 +72,18 @@ class TrafficLimiter extends AbstractPersistence
         self::setCreators($conf->getKey('creators', 'traffic'));
         self::setExempted($conf->getKey('exempted', 'traffic'));
         self::setLimit($conf->getKey('limit', 'traffic'));
+        self::$_ipKey = 'REMOTE_ADDR';
 
+        // SECURITY FIX: Only use X-Forwarded-For if from trusted proxy
         if (!empty($option = $conf->getKey('header', 'traffic'))) {
-            $httpHeader = 'HTTP_' . $option;
-            if (array_key_exists($httpHeader, $_SERVER) && !empty($_SERVER[$httpHeader])) {
-                self::$_ipKey = $httpHeader;
+            $httpHeader = 'HTTP_' . strtoupper($option);
+            // Only trust X-Forwarded-For from known proxies (configure in conf.php)
+            $trustedProxies = array_filter(array_map('trim', explode(',', (string) $conf->getKey('trusted_proxies', 'traffic'))));
+            if (!empty($trustedProxies) && array_key_exists($httpHeader, $_SERVER) && !empty($_SERVER[$httpHeader])) {
+                // Validate request comes from a trusted proxy
+                if (in_array($_SERVER['REMOTE_ADDR'] ?? '', $trustedProxies, true)) {
+                    self::$_ipKey = $httpHeader;
+                }
             }
         }
     }

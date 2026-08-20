@@ -2012,10 +2012,37 @@ window.PrivateBin = (function () {
                 pasteUrl.addEventListener('click', pasteLinkClick);
             }
 
-            // delete link
+            // delete link - Security fix: Don't use direct link with token in URL
+            // Instead, use click handler with confirmation and sessionStorage token
             const deleteLink = document.getElementById('deletelink');
             if (deleteLink) {
-                deleteLink.href = deleteUrl;
+                // Extract pasteid from deleteUrl
+                const match = deleteUrl.match(/pasteid=([a-f0-9]+)/);
+                if (match && match[1]) {
+                    const pasteId = match[1];
+                    deleteLink.href = '#';
+                    deleteLink.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        
+                        // Get delete token from sessionStorage
+                        const deleteToken = sessionStorage.getItem('deletetoken_' + pasteId);
+                        if (!deleteToken) {
+                            Alert.error(I18n._('Error: Delete token not found. Please recreate the paste to delete it.'));
+                            return;
+                        }
+                        
+                        // Show confirmation dialog
+                        if (!confirm(I18n._('Are you sure you want to delete this paste? This action cannot be undone.'))) {
+                            return;
+                        }
+                        
+                        // Send DELETE request via POST with token in body (not URL)
+                        ServerInteraction.deletePaste(pasteId, deleteToken);
+                        
+                        // Clear token from sessionStorage after deletion attempt
+                        sessionStorage.removeItem('deletetoken_' + pasteId);
+                    });
+                }
             }
             I18n._(document.querySelector('#deletelink span:not(.glyphicon)'), 'Delete data');
 
@@ -5107,6 +5134,42 @@ window.PrivateBin = (function () {
             return errorArray;
         };
 
+        /**
+         * Delete a paste (security fix: token sent via POST body, not URL)
+         *
+         * @name    ServerInteraction.deletePaste
+         * @async
+         * @function
+         * @param {string} pasteId
+         * @param {string} deleteToken
+         */
+        me.deletePaste = async function (pasteId, deleteToken) {
+            try {
+                const response = await fetch(Helper.baseUri() + '?pasteid=' + pasteId, {
+                    method: 'DELETE',
+                    headers: ajaxHeaders,
+                    body: JSON.stringify({ deletetoken: deleteToken })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    Alert.hideLoading();
+                    Alert.showStatus(I18n._('Paste deleted successfully.'));
+                    // Redirect to home page after successful deletion
+                    setTimeout(function() {
+                        window.location = Helper.baseUri();
+                    }, 2000);
+                } else {
+                    Alert.hideLoading();
+                    Alert.showError(data.message || I18n._('Error: Could not delete the paste.'));
+                }
+            } catch (error) {
+                Alert.hideLoading();
+                Alert.showError(I18n._('Error: ' + error.message));
+            }
+        };
+
         return me;
     })();
 
@@ -5136,8 +5199,17 @@ window.PrivateBin = (function () {
 
             // show notification
             const baseUri = Helper.baseUri() + '?',
-                url = baseUri + data.id + (TopNav.getBurnAfterReading() ? loadConfirmPrefix : '#') + CryptTool.base58encode(data.encryptionKey),
-                deleteUrl = baseUri + 'pasteid=' + data.id + '&deletetoken=' + data.deletetoken;
+                url = baseUri + data.id + (TopNav.getBurnAfterReading() ? loadConfirmPrefix : '#') + CryptTool.base58encode(data.encryptionKey);
+            
+            // Security fix: Store delete token in sessionStorage, not in URL
+            // This prevents token leakage through browser history, server logs, referrer headers
+            if (data.deletetoken) {
+                sessionStorage.setItem('deletetoken_' + data.id, data.deletetoken);
+            }
+            
+            // Create delete URL without exposing token (token stored in sessionStorage)
+            const deleteUrl = baseUri + 'pasteid=' + data.id + '#delete';
+            
             PasteStatus.createPasteNotification(url, deleteUrl);
 
             // show new URL in browser bar

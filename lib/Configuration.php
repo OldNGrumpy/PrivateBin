@@ -66,6 +66,12 @@ class Configuration
             'qrcode'                   => true,
             'email'                    => true,
             'icon'                     => 'jdenticon',
+            // Content Security Policy Header
+            // IMPORTANT SECURITY NOTE: 'wasm-unsafe-eval' is ONLY needed for zlib WebAssembly compression.
+            // It is NOT used for JavaScript eval(). Eval is prohibited by eslint config.
+            // - If compression is disabled, use stricter policy: script-src 'self' (remove 'wasm-unsafe-eval')
+            // - Stricter policy with nonces is possible but requires template changes
+            // See: https://github.com/PrivateBin/PrivateBin/wiki/Configuration#cspheader
             'cspheader'                => 'default-src \'none\'; base-uri \'self\'; form-action \'none\'; manifest-src \'self\'; connect-src * blob:; script-src \'self\' \'wasm-unsafe-eval\'; style-src \'self\'; font-src \'self\'; frame-ancestors \'none\'; frame-src blob:; img-src \'self\' data: blob:; media-src blob:; object-src blob:; sandbox allow-same-origin allow-scripts allow-forms allow-modals allow-downloads',
             'httpwarning'              => true,
             'compression'              => 'zlib',
@@ -89,10 +95,11 @@ class Configuration
             'markdown'           => 'Markdown',
         ],
         'traffic' => [
-            'limit'     => 10,
-            'header'    => '',
-            'exempted'  => '',
-            'creators'  => '',
+            'limit'           => 10,
+            'header'          => '',
+            'trusted_proxies' => '',
+            'exempted'        => '',
+            'creators'        => '',
         ],
         'purge' => [
             'limit'     => 300,
