@@ -11,7 +11,7 @@ services:
       - privatebin_data:/var/www/html/data
       - ./conf.php:/etc/privatebin/conf.php:ro
     ports:
-      - "127.0.0.1:8087:80"
+      - "0.0.0.0:8087:80"
 
 volumes:
   privatebin_data:

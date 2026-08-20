@@ -186,14 +186,14 @@ limit = 10
 ; separated. Leave unset to allow anyone to create documents.
 ; creators = "1.2.3.4,10.10.10/24"
 
-; This deployment sits behind 1Panel's own OpenResty reverse proxy on the same
-; host, which forwards the real visitor IP in X-Forwarded-For. Trust only that
-; local hop so the header can't be spoofed by anyone but the proxy itself.
+; This deployment sits behind an external Caddy reverse proxy (192.168.2.1),
+; which forwards the real visitor IP in X-Forwarded-For. Trust only that host
+; so the header can't be spoofed by anyone but the proxy itself.
 header = "X_FORWARDED_FOR"
 
 ; (required when "header" is set) comma-separated IP addresses of trusted
 ; reverse proxies. The forwarded header is ignored from all other clients.
-trusted_proxies = "127.0.0.1"
+trusted_proxies = "192.168.2.1"
 
 [purge]
 ; minimum time limit between two purgings of expired documents, it is only
